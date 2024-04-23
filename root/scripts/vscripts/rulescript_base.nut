@@ -146,7 +146,7 @@ class RRule {
 
 	function SelectResponse() {
 		local debug = Convars.GetFloat("rr_debugresponses")
-		if ( debug > 0 ) {
+		if ( debug != 0 ) {
 			print("Matched rule: " )
 			Describe( false )
 		}
@@ -175,7 +175,7 @@ class RRule {
 			}
 		}
 		if ( !("odds" in R.params) || RandomInt(0, 100) <= R.params.odds ) {
-			if ( debug > 0 ) {
+			if ( debug != 0 ) {
 				print("Matched ")
 				R.Describe()
 			}
@@ -202,7 +202,7 @@ class RRule {
 	function Disable()
 	{
 		enabled = false;
-		if(Convars.GetFloat("rr_debugresponses") > 0) {
+		if(Convars.GetFloat("rr_debugresponses") != 0) {
 			printl( "Matching of rule " + rulename + " disabled until next round" )
 		}
 		//printl( "TODO: rule " + rulename + " wants to disable itself." )

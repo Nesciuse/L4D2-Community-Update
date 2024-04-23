@@ -1,10 +1,10 @@
-// see response_testbed.nut for the definitions of the types used below 
+// see response_testbed.nut for the definitions of the types used below
 
 
 // Each Rule consists of the following fields in a table
 // * name		: an arbitrary rule name, for your convenience in debugging.
-// * criteria	: an array of criteria that must be met for the rule to be considered a match. 
-//		Criteria may be static string/numeric comparisons, or functions. 
+// * criteria	: an array of criteria that must be met for the rule to be considered a match.
+//		Criteria may be static string/numeric comparisons, or functions.
 // * responses	: an array of individual Response objects, emulating their counterparts in RR1.
 
 // --- CRITERIA
@@ -12,14 +12,14 @@
 // * STATIC criteria compare a fact (as a number) to a range on a number line, or strings to each other.
 //	  So, 'foo > 4', 'foo > 0 and foo < 10', 'foo = 6', ' foo = "bar" ' are all static criteria. These are very fast to match.
 // * FUNCTION criteria are arbitrary Squirrel functions returning TRUE or FALSE. They may do any work you like, but
-//   incur a 3 microsecond overhead to call, in addition to the work the function itself does. 
+//   incur a 3 microsecond overhead to call, in addition to the work the function itself does.
 // A rule must match all of its static criteria before the function criteria are even tested, so the more narrowly
 // constrained your rule, the less of an impact the functions will have.
 // Static criteria follow the form:
-//   [ name, a, b ] compares the value of key 'name' to see if it is >= a and <= b. 
-//   a and b may be null, in which case they represent negative and positive infinity. 
+//   [ name, a, b ] compares the value of key 'name' to see if it is >= a and <= b.
+//   a and b may be null, in which case they represent negative and positive infinity.
 //   See below for examples.
-// A function criterion takes one parameter: 'query' and should return a boolean 
+// A function criterion takes one parameter: 'query' and should return a boolean
 // so you could define one ahead of time like
 // function FooCriterion(query) {  return query.foo > g_rr.whatever.foo }
 // Here's example of different kinds of criteria
@@ -33,14 +33,14 @@
 //		@(query) query.blarg % 3 == 0	// anonymous function declared inline -- is fact "blarg" divisible by 3?
 //	]
 
-// --- RESPONSES 
+// --- RESPONSES
 
 // Emulates a single Response object from RR1, which is eg an individual 'speak' or 'sentence' etc
 // A response consists of a table with these fields:
-// target	: a string like "foo.vcd", 
-// func		: which is a script function to call before performing Target (optional)	
+// target	: a string like "foo.vcd",
+// func		: which is a script function to call before performing Target (optional)
 //			  this function may be specified by name, or as an anonymous @ function.
-// and a Params object which is a table consisting of the optional parameters below. 
+// and a Params object which is a table consisting of the optional parameters below.
 //	( Omitting an entry in Params assumes a reasonable default. )
 // Optional parameters:
 //   nodelay = an additional delay of 0 after speaking
@@ -59,13 +59,13 @@
 // see the "DemonstrateScriptFollowup" concept below for details
 
 
-// all of this is experimental code not relevant to the running game. 
+// all of this is experimental code not relevant to the running game.
 
 
 function rr_CharacterSpeak( speaker, query )
 {
       local q = ::rr_QueryBestResponse( speaker, query_params ) // looks up the result, returns null if none found
-      if(q) 
+      if(q)
             ::rr_CommitAIResponse( speaker, q ) // this actually makes the character speak
 }
 
@@ -83,7 +83,7 @@ function DemoScriptFollowupFunction( speaker, query )
 CriterionIsNotCoughing <- [ "Coughing", 0 ]
 CriterionIsc6m3_port  <- [ "map", "c6m3_port" ]  //use for the moveon example below to scope the rule change
 CriterionIsAwardProtector  <- [ "awardname","Protector" ]
- 
+
 // and then include it into the criteria lists as per the examples below. The "g_rr." part
 // is a bit of temporary cruft that will go away once we resolve some questions about scope resolution
 // in map .nut files.
@@ -92,7 +92,7 @@ CriterionIsAwardProtector  <- [ "awardname","Protector" ]
 function DemoWritingContextToCharacter( speaker, query )
 {
 	// look up a 'bananas' context in the query, add one to it, and write it to the character. write 1 if query has no bananas.
-	if ( "bananas" in query ) 
+	if ( "bananas" in query )
 	{
 		speaker.SetContext( "bananas", (query["bananas"] + 1).tostring(), 0 )
 	}
@@ -103,7 +103,7 @@ function DemoWritingContextToCharacter( speaker, query )
 }
 // just prints a table to the console
 // for scoping reasons too dumb to go into, to access this you'll need
-// to actually type 'g_rr.PrintTable'. 
+// to actually type 'g_rr.PrintTable'.
 
 function PrintTable( t )
 {
@@ -124,7 +124,7 @@ function SetAwardSpeech	(speaker, query)
 function SubjectAward ( query )
 {
 		if ( "AwardSpeech" in query )
-	{ 
+	{
 		if ( query["AwardSpeech"] == query["subject"] )
 		{
 			return true
@@ -136,7 +136,7 @@ function SubjectAward ( query )
 	}
 	else
 	{
-			return false	
+			return false
 	}
 }
 
@@ -221,8 +221,8 @@ g_decisionrules <- [
 		g_rr.CriterionIsAwardProtector
 	],
 	responses = [
-		{ 
-			func = SetAwardSpeech	
+		{
+			func = SetAwardSpeech
 		}
 	],
 	group_params = RGroupParams({ permitrepeats = true, sequential = false, norepeat = false })
@@ -230,20 +230,140 @@ g_decisionrules <- [
 {
 	name = "ProtectedFriendlyFire",
 	criteria = [
-		[ "concept", "PlayerFriendlyFire" ], 
+		[ "concept", "PlayerFriendlyFire" ],
 		[ SubjectAward ]
 	],
 	responses = [
-		{ 
-			func = DemoScriptFollowupFunction			
+		{
+			func = DemoScriptFollowupFunction
 		}
 	],
 	group_params = RGroupParams({ permitrepeats = true, sequential = false, norepeat = false })
+},
+{
+    name = "ImprovedTalkerTest0",
+    criteria =
+    [
+        [ "concept", "test"]
+    ],
+    responses = [
+        { func = @(s,q)printl("repeats 1") },
+        { func = @(s,q)printl("repeats 2"), speakonce = true},
+        { func = @(s,q)printl("repeats 3") },
+        { func = @(s,q)printl("repeats 4"), displaylast = true }, //makes sense if permitrepeates ?
+        { func = @(s,q)printl("repeats 5") },
+        { func = @(s,q)printl("repeats 6"), displayfirst = true },
+        { func = @(s,q)printl("repeats 7") }
+    ]
+    applycontext = { context = "test", value = "666", duration = 0}
+    group_params = g_rr.RGroupParams({permitrepeats=true})
+}
+{
+    name = "ImprovedTalkerTest1",
+    criteria =
+    [
+        [ "concept", "test"]
+    ],
+    responses = [
+
+        { func = @(s,q)printl("norepeat 1")}
+        { func = @(s,q)printl("norepeat 2"), weight = 3 } //todo weight of responses
+        { func = @(s,q)printl("norepeat 3")}
+        { func = @(s,q)printl("norepeat 4")}
+        { func = @(s,q)printl("norepeat 5")}
+        { func = @(s,q)printl("norepeat 666"), displaylast = true }
+    ]
+    group_params = g_rr.RGroupParams({norepeat=true})
+}
+{
+    name = "ImprovedTalkerTest2",
+    criteria =
+    [
+        [ "concept", "test"]
+    ],
+    responses = [
+
+        { func = @(s,q)printl("norepeat seq 1") }
+        { func = @(s,q)printl("norepeat seq 2") }
+        { func = @(s,q)printl("norepeat seq 3") }
+        { func = @(s,q)printl("norepeat seq 4") }
+    ]
+    group_params = g_rr.RGroupParams({norepeat=true, sequential=true})
+}
+{
+    name = "ImprovedTalkerTest3",
+    criteria =
+    [
+        [ "concept", "test"]
+    ],
+    responses = [
+        { func = @(s,q)printl("once 1")},
+        { func = @(s,q)printl("once 2")},
+        { func = @(s,q)printl("once 3")}
+    ]
+    group_params = g_rr.RGroupParams({matchonce=true})
+}
+{
+    name = "ImprovedTalkerTestLastMatchedFirst",
+    criteria =
+    [
+        [ "concept", "test2"]
+    ],
+    responses = [
+         { func = @(s,q)printl("will NEVER run this one")},
+    ]
+}
+{
+    name = "ImprovedTalkerTestLastMatchedFirst2",
+    criteria =
+    [
+        [ "concept", "test2"]
+    ],
+    responses = [
+        { func = @(s,q)printl("will ALWAYS run this one")},
+    ]
+}
+{
+    name = "ImprovedTalkerTestLastMatchedFirstSolution",
+    criteria =
+    [
+        [ "concept", "test3"]
+    ],
+    responses = [
+         { func = @(s,q)printl("first")},
+    ]
+}
+{
+    name = "ImprovedTalkerTestLastMatchedFirst2Solution",
+    criteria =
+    [
+        [ "concept", "test3", "test3", 0.5],
+        [ "randomnum", 0, 50, 1, "optional"]
+    ],
+    responses = [
+        { func = @(s,q)printl("second")},
+    ]
 }
 ]
 
+if(developer() && !IsDedicatedServer()) {
+    function rr_testing() {
+        if(Convars.GetClientConvarValue("rr_test_rules", 1) != "") {
+            if(Convars.GetFloat("rr_debugresponses") == 0) {
+                printl("Setting rr_debugresponses to -1 for vscript rules")
+                Convars.SetValue("rr_debugresponses", -1);
+            }
+            rr_ProcessRules( g_decisionrules );
 
-//rr_ProcessRules( g_decisionrules )
-
-
-
+            ::rrtest <- function(i="") {
+                EntFire("!player", "SpeakResponseConcept", "test"+i);
+            }
+        }
+        else {
+            printl("use setinfo rr_test_rules 1 and reload the map to activate test rules");
+        }
+    }
+    DoEntFire("!self", "RunScriptCode", @"
+        g_MapScript.ScriptedMode_CallNextUpdate(g_rr.rr_testing.bindenv(g_rr));
+    ", 10, null, Entities.First() );
+}

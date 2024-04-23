@@ -151,12 +151,12 @@ class RThen {
 		}
 
 		// debug prints...
-		if ( Convars.GetFloat( "rr_debugresponses" ) > 0 )
+		if ( Convars.GetFloat( "rr_debugresponses" ) != 0 )
 		{
 			print( "RThen followup called:\n\ttarget: " )
 			printl(target)
 
-			if ( Convars.GetFloat( "rr_debugresponses" ) >= 2 )
+			if ( fabs(Convars.GetFloat( "rr_debugresponses" )) >= 2)
 			{
 				print( "\taddcontexts: {")
 				foreach (k,v in addcontexts)
