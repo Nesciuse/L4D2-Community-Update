@@ -15,32 +15,46 @@ function rrPrintTable( tabl, prefix = "\t" )
 // Define an individual "static" criterion, varying between a bottom and top integral value
 class Criterion {
 	//constructor
-	constructor( k, b, t )
+	constructor( k, b, t, w=1 )
 	{
 		key = k
 		bottom = b
 		top = t
+		if(w > 0) {
+			weight = w
+		}
 	}
 
 	//member function
 	function Describe()
 	{
-		printl( "Criterion " + key + " " + bottom + ".." + top )
+		printl( "Criterion " + key + " " + bottom + ".." + top + " weight " + weight )
 	}
 
 	//property
 	key = null;
 	bottom = null;
 	top = null;
+	weight = 1;
 }
 
+class OptionalCriterion extends Criterion {
+	optional = 1
+	function Describe() {
+		print( "Optional " );
+		base.Describe();
+	}
+}
 // Define a functor criterion, where the comparator is a function returning a bool
 class CriterionFunc {
 	//constructor
-	constructor( k, f )
+	constructor( k, f, w=1)
 	{
 		key = k
 		func = f
+		if(w > 0) {
+			weight = w
+		}
 	}
 
 	//member function
@@ -52,8 +66,16 @@ class CriterionFunc {
 	//property
 	key = null;
 	func = null;
+	weight = 1;
 }
 
+class OptionalCriterionFunc extends CriterionFunc {
+	optional = 1
+	function Describe() {
+		print( "Optional " );
+		base.Describe();
+	}
+}
 // Multiple lines
 // response <responsegroupname>
 // {
@@ -122,8 +144,7 @@ class RRule {
 	// When a rule matches, call this to pick a response.
 	// TODO: test
 
-	function SelectResponse()
-	{
+	function SelectResponse() {
 		local debug = Convars.GetFloat("rr_debugresponses")
 		if ( debug > 0 ) {
 			print("Matched rule: " )
@@ -132,34 +153,19 @@ class RRule {
 		assert(responses.len() != 0)
 
 		local res_index
-		if ( group_params.permitrepeats ) {
-			// just randomly pick a response
+		if(group_params.permitrepeats) {
 			res_index = RandomInt( 0, responses.len() - 1 )
 		}
-		else {
-			local unplayed_count = unplayed_responses.len();
-			switch(unplayed_count) {
-				case 0: // out of unplayed responses, reset
-					ResetUnplayedResponsesStack();
-					unplayed_count = unplayed_responses.len();
-					break;
-				case 1: //this will be last response so disable to not match it again in this round
-					if(group_params.norepeat) {
-						Disable();
-					}
-			}
-			// okay, now pick a response
-
-			if ( group_params.sequential ) {
-				res_index = unplayed_responses.pop()
-			}
-			else {
-				// choose randomly from available unplayed responses
-				res_index = unplayed_responses.remove(RandomInt( 0, unplayed_count - 1 ))
-			}
+		else if(group_params.sequential) {
+			res_index = unplayed_responses.pop()
 		}
-
-		local R = responses[res_index]
+		else {
+			// choose randomly from available unplayed responses
+			res_index = unplayed_responses.remove(RandomInt( 0, unplayed_responses.len() - 1 ))
+		}
+		//chosen response that will be returned, set to empty unless it passes the odds
+		//TODO check regular talker odds behavior
+		local R = responses[res_index], chosen = {}
 		if ( "speakonce" in R.params ) {
 			responses.remove(res_index)
 			foreach(ix, rix in unplayed_responses) {
@@ -168,25 +174,26 @@ class RRule {
 				}
 			}
 		}
-		local chosen = {}
-		//chosen response that will be returned, set to empty unless it passes the odds
-		//ensures single return in this function and no duplicate check
-		//should we try to pick other response if odds don't pass instead if available ?
-		//TODO check regular talker odds behavior
 		if ( !("odds" in R.params) || RandomInt(0, 100) <= R.params.odds ) {
 			if ( debug > 0 ) {
-				print("Matched " )
+				print("Matched ")
 				R.Describe()
 			}
 			if ( "fire" in R.params ) {
-				//just fire whatever, no good reason to limit this to single logic_relay
 				EntFire( R.params.fire[0], R.params.fire[1], "", R.params.fire[2])
 			}
 			chosen = R
 		}
-
 		if ( group_params.matchonce || responses.len() == 0) {
 			Disable()
+		}
+		else if( unplayed_responses.len() == 0 ) {
+			if(group_params.norepeat) {
+				Disable();
+			}
+			else {
+				ResetUnplayedResponsesStack();
+			}
 		}
 		return chosen
 	}
@@ -210,6 +217,6 @@ class RRule {
 
 	enabled = true;
 
-	// stack of unplayed_responses
+	// stack of unplayed_responses with firts response on top
 	unplayed_responses = null;
 }

@@ -324,56 +324,61 @@ class RThen {
 // functor criteria must always be functions taking (val, query) where val is the value of a fact (may be Null) and 'query' is a table
 function rr_ProcessCriterion( crit )
 {
-	if ( typeof(crit) == "function" )
-	{
-		return CriterionFunc( null, crit )
-	}
-	else if ( typeof(crit) == "array" )
-	{
-		switch( crit.len() )
-		{
-			case 1:
-				if (typeof(crit[0])=="function")
-				{
-					return CriterionFunc( null, crit[0] )
-				}
-				else
-				{
+	switch(typeof(crit)) {
+		case "function":
+			return CriterionFunc( null, crit )
+
+		case "array":
+			local weight = 1, length = crit.len();
+			local crit_func = CriterionFunc, crit_static = Criterion;
+			switch(length) {
+				case 5:
+					assert(crit[4] == "optional")
+					crit_func = OptionalCriterionFunc
+					crit_static = OptionalCriterion
+					length--;
+				case 4:
+					assert(typeof(crit[3]) == "integer" || typeof(crit[3]) == "float")
+					weight = crit[3];
+					length--;
+			}
+
+			switch( length )
+			{
+				case 1:
+					if (typeof(crit[0])=="function")
+					{
+						return crit_func( null, crit[0], weight )
+					}
 					assert( typeof(crit[0]) == "string" )
-					return Criterion( crit[0], null, null )
-				}
-				break
-			case 2:
-				assert( typeof(crit[0]) == "string" )
-				if (typeof(crit[1])=="function")
-				{
-					return CriterionFunc( crit[0], crit[1] )
-				}
-				else
-				{
-					return Criterion( crit[0], crit[1], crit[1] )
-				}
-				break
-			case 3:
-				assert( typeof(crit[0]) == "string" )
-				if (crit[1] == null)
-				{
-					crit[1] = 0
-				}
-				if (crit[2] == null)
-				{
-					crit[2] = 999999
-				}
-				return Criterion( crit[0], crit[1], crit[2] )
-				break
-			default:
-				throw ( "Invalid criterion: " + crit )
+					return crit_static( crit[0], null, null, weight )
+
+				case 2:
+					assert( typeof(crit[0]) == "string" )
+					if (typeof(crit[1])=="function")
+					{
+						return crit_func( crit[0], crit[1], weight ) //unimplemented
+					}
+					return crit_static( crit[0], crit[1], crit[1], weight )
+
+				case 3:
+					assert( typeof(crit[0]) == "string" )
+					if (crit[1] == null)
+					{
+						crit[1] = -9999999
+					}
+					if (crit[2] == null)
+					{
+						crit[2] = 9999999
+					}
+					return crit_static( crit[0], crit[1], crit[2], weight )
+
+				default:
+					throw ( "Invalid criterion: " + crit )
+			}
 		}
-	}
-	else
-	{
-		throw( "Invalid type for criterion: " + typeof(crit) )
-	}
+
+	throw( "Invalid type for criterion: " + typeof(crit) )
 }
 
 function rr_PlaySoundFile( speaker, query, soundfile, context, contexttoworld, volume, func )
