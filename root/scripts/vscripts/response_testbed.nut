@@ -5,23 +5,23 @@ IncludeScript("rulescript_base", this)
 
 // The different kinds of available response
 // must exactly match ResponseType_t in code.
-enum ResponseKind 
+enum ResponseKind
 {
 	none,		// invalid type
-	speak,		// it's an entry in sounds.txt
-	sentence,	// it's a sentence name from sentences.txt
+	speak,		// it's an entry in sounds.txt (not implemented)
+	sentence,	// it's a sentence name from sentences.txt (not implemented)
 	scene,		// it's a .vcd file
-	response,	// it's a reference to another response group by name
-	print,		// print the text in developer 2 (for placeholder responses)
+	response,	// it's a reference to another response group by name (not implemented)
+	print,		// print the text in developer 2 (for placeholder responses) (not implemented)
 	script		// a script function
 }
 
 
 // Emulates a single Response object from RR1, which is eg an individual 'speak' or 'sentence' etc
-// A response consists of a Kind (see ResponseKind above), 
-// a Target which is a string like "foo.vcd", 
+// A response consists of a Kind (see ResponseKind above),
+// a Target which is a string like "foo.vcd",
 // a Func (option), which is a script function to call before performing Target
-// and a Params object which is a table consisting of the optional parameters below. 
+// and a Params object which is a table consisting of the optional parameters below.
 //	( Omitting an entry in Params assumes a reasonable default. )
 // Optional parameters:
 //   nodelay = an additional delay of 0 after speaking
@@ -44,13 +44,13 @@ class ResponseSingle {
 		target = _target
 		rule = _rule
 		params = _params
-		func = _func 
-		
+		func = _func
+
 		// assert valid types
 		assert( typeof( kind ) == "integer" )
 		assert( typeof( params ) == "table" )
 	}
-	function Describe() 
+	function Describe()
 	{
 		print("Response:\n")
 		print("\tkind " + kind)
@@ -58,15 +58,15 @@ class ResponseSingle {
 		foreach ( k,v in params )
 			print("\t" + k + " : " + v + "\n")
 	}
-	// properties 
+	// properties
 	kind = null; // one of the ResponseKind enumerations
 	target = null; // will be a string or a function
 	func = null;
 	params = null; // will be a table
 	rule = null; // reference back to the rule to which I belong
-	
+
 	cpp_visitor = null; // a field for the C++ code to store whatever opaque info it needs in this object.
-	
+
 	function _tostring()
 	{
 		return "ResponseSingle: " + target
@@ -85,22 +85,22 @@ class ResponseSingle {
 class RGroupParams {
 	// constructor
 	constructor( parms = {} )
-	{	
+	{
 		if ( "permitrepeats" in parms && parms.permitrepeats )
-			permitrepeats = true
+			permitrepeats = true;
 		if ( "sequential" in parms && parms.sequential )
-			sequential = true
+			sequential = true;
 		if ( "norepeat" in parms && parms.norepeat )
-			norepeat = true
+			norepeat = true;
 		if ( "matchonce" in parms && parms.matchonce )
-			matchonce = true
+			matchonce = true;
 	}
-	// properties 
-	permitrepeats = false; 
-	sequential = false;  
-	norepeat = false;  
+	// properties
+	permitrepeats = false;
+	sequential = false;
+	norepeat = false;
 	matchonce = false;
-}	
+}
 
 
 // A followup event like the old response Then.
@@ -122,9 +122,9 @@ class RThen {
 		assert( typeof(_concept) == "string" )
 		concept = _concept
 		delay = _delay.tofloat()
-		
+
 		// in rr2 "concept" is just another fact in the query
-		if ( _contexts == null ) 
+		if ( _contexts == null )
 		{
 			_contexts = {}
 		}
@@ -133,12 +133,12 @@ class RThen {
 			throw("RThen() error: _contexts parameter isn't a table or null")
 		}
 		addcontexts = clone _contexts
-		
+
 		//addcontexts.concept <- _concept
 		func = execute.bindenv(this)
 	}
-	
-	function execute( speaker, query ) 
+
+	function execute( speaker, query )
 	{
 		if ( target.tolower() == "namvet" )
 			target = "NamVet"
@@ -149,18 +149,18 @@ class RThen {
 			local firstletter = target.slice(0,1)
 			target = firstletter.toupper() + target.slice(1)
 		}
-		
+
 		// debug prints...
 		if ( Convars.GetFloat( "rr_debugresponses" ) > 0 )
 		{
 			print( "RThen followup called:\n\ttarget: " )
 			printl(target)
-		
+
 			if ( Convars.GetFloat( "rr_debugresponses" ) >= 2 )
 			{
 				print( "\taddcontexts: {")
 				foreach (k,v in addcontexts)
-				{ 
+				{
 					print("\n\t")
 					print(k)
 					print(" : ")
@@ -171,13 +171,13 @@ class RThen {
 			}
 			print( "\t(end followup)\n")
 		}
-		
+
 		// merge addcontexts into query
 		/*foreach (k,v in addcontexts)
 		{
 			query[k] <- v
 		}*/
-		
+
 		local criteria = ""
 		// merge addcontexts into criteria string
 		foreach (k,v in addcontexts)
@@ -187,7 +187,7 @@ class RThen {
 			else
 				criteria = criteria + "," + k + ":" + v
 		}
-		
+
 		if ( target.tolower() == "all" )
 		{
 			local expressers = ::rr_GetResponseTargets()
@@ -233,7 +233,7 @@ class RThen {
 				// find the highest-scoring entry and play that
 				local idx = 1
 				local best = 0
-				while ( idx < results.len() ) 
+				while ( idx < results.len() )
 				{
 					if ( results[i][1].score > results[best][1].score )
 					{
@@ -269,7 +269,7 @@ class RThen {
 				QueueSpeak( orator, concept, 0.0, criteria )
 		}
 		else
-		{	
+		{
 			local expressers = ::rr_GetResponseTargets()
 			if ( target in expressers )
 			{
@@ -305,7 +305,7 @@ class RThen {
 	delay = null; // delay as passed to the code followup class
 	func = null; // what gets called when the followup triggers
 	concept = null; // concept is always present here, from the constructor.
-	
+
 	function _tostring()
 	{
 		return "RThen: " + target
@@ -326,7 +326,7 @@ function rr_ProcessCriterion( crit )
 {
 	if ( typeof(crit) == "function" )
 	{
-		return CriterionFunc( null ) 
+		return CriterionFunc( null, crit )
 	}
 	else if ( typeof(crit) == "array" )
 	{
@@ -342,7 +342,7 @@ function rr_ProcessCriterion( crit )
 					assert( typeof(crit[0]) == "string" )
 					return Criterion( crit[0], null, null )
 				}
-				break	
+				break
 			case 2:
 				assert( typeof(crit[0]) == "string" )
 				if (typeof(crit[1])=="function")
@@ -353,7 +353,7 @@ function rr_ProcessCriterion( crit )
 				{
 					return Criterion( crit[0], crit[1], crit[1] )
 				}
-				break	
+				break
 			case 3:
 				assert( typeof(crit[0]) == "string" )
 				if (crit[1] == null)
@@ -370,7 +370,7 @@ function rr_ProcessCriterion( crit )
 				throw ( "Invalid criterion: " + crit )
 		}
 	}
-	else 
+	else
 	{
 		throw( "Invalid type for criterion: " + typeof(crit) )
 	}
@@ -448,7 +448,7 @@ function rr_ProcessResponse( resp )
 	local scene = null
 	local applycontext = null
 	local applycontexttoworld = false
-	
+
 	if ( "applycontext" in resp )
 	{
 		applycontext = resp.applycontext
@@ -457,18 +457,18 @@ function rr_ProcessResponse( resp )
 	{
 		applycontexttoworld = resp.applycontexttoworld
 	}
-	if ( "func" in resp ) 
+	if ( "func" in resp )
 	{
 		func = resp.func
-		
+
 		// we still need to store the 'resp' table as a strong reference in the ResponseSingle object
 		// so that it doesn't get garbage-collected. .bindenv only stores weak references to objects
 		// so you can't count on it to actually hang onto the closure table.
-	} 
+	}
 	if ( "scenename" in resp )
 	{
 		scene = resp.scenename
-		
+
 		local Func = func
 		if ( applycontext )
 			func = @( speaker, query ) g_rr.rr_ApplyContext( speaker, query, applycontext, applycontexttoworld, Func )
@@ -483,18 +483,18 @@ function rr_ProcessResponse( resp )
 		local volume = 1
 		if ( "volume" in resp )
 			volume = resp.volume
-		
+
 		local Func = func
 		func = @( speaker, query ) g_rr.rr_PlaySoundFile( speaker, query, resp.soundfile, applycontext, applycontexttoworld, volume, Func )
 	}
-	
+
 	local kind = ResponseKind.none
 	if ( scene )
 	{
 		kind = ResponseKind.scene
 	}
-	else if ( func ) 
-	{	
+	else if ( func )
+	{
 		kind = ResponseKind.script
 	}
 	else
@@ -503,27 +503,78 @@ function rr_ProcessResponse( resp )
 		resp.Describe()
 		return null
 	}
-	
+
 	return ResponseSingle( kind, scene, null, func, resp )
+}
+
+local empty_group_params = RGroupParams();
+local function enabled_rule_check(rule_container) {
+	return function(query) {
+		return rule_container[0].enabled;
+	}
+}
+
+local all_rules = [];
+function rr_InitRules() {
+	foreach(rule in all_rules) {
+		rule.Init();
+	}
+}
+
+//can add more easily if needed
+local keys_from_rules_to_insert = [
+	"applycontext",
+	"applycontexttoworld"
+];
+
+local function rr_ProcessRuleApplyContexts(rule) {
+	local keys = keys_from_rules_to_insert.filter(@(ix, key) key in rule);
+	if(keys.len() == 0) {
+		return;
+	}
+
+	local responses_clone = clone rule.responses
+	rule.responses = responses_clone;
+
+	foreach(key in keys) {
+		foreach(ix, response in responses_clone) {
+			if(!(key in response)) {
+				local resp_clone = clone response;
+				resp_clone[key] <- rule[key];
+				responses_clone[ix] = resp_clone;
+
+			}
+		}
+	}
 }
 
 function rr_ProcessRules( rulesarray )
 {
-	local debug_rules_arr = []
+	//local debug_rules_arr = []
 	foreach( rule in rulesarray )
 	{
-		// need to bind the rr_ProcessCriterion function in a closure containing this environment,
-		// otherwise for whatever reason it won't be able to find the Criterion and CriterionFunctor 
-		// classes in its scope.
-		local coderule = RRule( rule.name, 
-			rule.criteria.map( rr_ProcessCriterion.bindenv( this ) ), 
+		if(!("group_params" in rule)) {
+			rule.group_params <- empty_group_params;
+		}
+		//if applycontext/applycontexttoworld defined in rule insert it in each response that doesn't have it
+		rr_ProcessRuleApplyContexts(rule);
+
+		//not ideal to add function criteria to every single rule but it's a cheap one
+		local container = [null];
+		rule.criteria.append(enabled_rule_check(container));
+
+		// needs to bindenv because because 'this' in map is the array whose map method was called
+		local coderule = RRule( rule.name,
+			rule.criteria.map( rr_ProcessCriterion.bindenv( this ) ),
 			rule.responses.map( rr_ProcessResponse.bindenv( this ) ),
 			rule.group_params  )
 		// fix up 'rule' in each response
-		foreach ( r in coderule.responses ) 
+		foreach ( r in coderule.responses )
 		{
 			r.rule = coderule
+			all_rules.append(coderule)
 		}
+		container[0] = coderule
 
 		if( !rr_AddDecisionRule( coderule ) )
 		{
@@ -531,12 +582,12 @@ function rr_ProcessRules( rulesarray )
 		}
 		// print("-- ADDED RULE--\n")
 		// coderule.Describe()
-		debug_rules_arr.push(coderule)
-	}	
+		//debug_rules_arr.push(coderule)
+	}
 }
 
 // Each individual rule has:
-// a name 
+// a name
 // criteria
 // responses
 //	if the response has a 'func' parameter, it is interpreted to be a script function that gets called with the following two parameters:
@@ -547,7 +598,7 @@ function rr_ProcessRules( rulesarray )
 //	it is an RGroupParams object, see above.
 // if a response is a function, it gets called with parameters (speaker, query)
 
-// fake rule table to test my parsing 
+// fake rule table to test my parsing
 // g_ignoredecisionrules <- [
 // {
 // 	name = "CoachSeeSmoker",
@@ -563,7 +614,7 @@ function rr_ProcessRules( rulesarray )
 // 		  soundlevel = 80,
 // 		  onFinish = @(query, speaker) speaker.smokersSeen += 1 // expected to be a function
 // 		} , {
-// 		  func = ZombieFreakout // if a 'func' key is present, this is expected to be a 'do function' response 
+// 		  func = ZombieFreakout // if a 'func' key is present, this is expected to be a 'do function' response
 // 		} , {
 // 		  func = @(query,speaker) speaker.PointAt( query.enemy ) // anonymous functions are ok too
 // 		} , {
@@ -575,7 +626,7 @@ function rr_ProcessRules( rulesarray )
 // 	group_params = RGroupParams({ permitrepeats = false, sequential = true, norepeat = false })
 // },
 // { // another rule to test that I don't inadvertently write state shared between rules
-// 	name = "Dummy", 
+// 	name = "Dummy",
 // 	criteria = [
 // 		[ "concept", "dummy" ], // arrays of two entries are considered to be fact = value
 // 		[ "speaker", "zombie" ]
@@ -584,9 +635,9 @@ function rr_ProcessRules( rulesarray )
 // 		{ scenename = "zombie.vcd", // if a 'scenename' key is present, this is expected to be a 'scene' response
 // 		  sndlevel = 80,
 // 		  onFinish = @(speaker, query) speaker.smokersSeen += 1 // expected to be a function
-// 		} 
+// 		}
 // 	],
-// 	group_params = RGroupParams( ) // default 
+// 	group_params = RGroupParams( ) // default
 // }
 // ]
 

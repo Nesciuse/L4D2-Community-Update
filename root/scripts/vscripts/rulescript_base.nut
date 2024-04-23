@@ -21,13 +21,13 @@ class Criterion {
 		bottom = b
 		top = t
 	}
-	
+
 	//member function
 	function Describe()
 	{
 		printl( "Criterion " + key + " " + bottom + ".." + top )
 	}
-	
+
 	//property
 	key = null;
 	bottom = null;
@@ -42,13 +42,13 @@ class CriterionFunc {
 		key = k
 		func = f
 	}
-	
+
 	//member function
 	function Describe()
 	{
 		printl( "Criterion functor " + key + " -> " + func )
 	}
-	
+
 	//property
 	key = null;
 	func = null;
@@ -71,29 +71,40 @@ class CriterionFunc {
 class RRule {
 	constructor( name, crits, _responses, _group_params )
 	{
+		// type-check
+		assert( _responses.len() > 0 )
+
 		rulename = name
 		criteria = crits
-		responses = _responses
+		original_responses = _responses
+		responses = clone _responses
 		group_params = _group_params
-		
-		// type-check
-		assert( responses.len() > 0 )
-		
-		// make a shallow copy of selection_state to avoid overwriting shared state
-		// (otherwise changes made in one instance will affect all others)
-		selection_state = clone selection_state
-		
-		
-		// make an array of one 'false' per response (eg no response has played yet)
-		selection_state.playedresponses <- responses.map( @(x) false )
+
+		Init();
 	}
-	
+
+	function Init() {
+		if(original_responses.len() != responses.len()) {
+			//speakonce param can remove a response from responses
+			responses = clone original_responses
+		}
+		ResetUnplayedResponsesStack();
+		enabled = true;
+	}
+
+	function ResetUnplayedResponsesStack() {
+		unplayed_responses = []
+		for(local ix = responses.len() - 1; ix >= 0; ix--) {
+			unplayed_responses.append(ix);
+		}
+	}
+
 	function Describe( verbose = true )
 	{
 		printl( rulename + "\n" + criteria.len() + " crits, " + responses.len() + " responses" )
 		if ( verbose )
 		{
-			foreach (crit in criteria) 
+			foreach (crit in criteria)
 			{
 				crit.Describe()
 			}
@@ -107,182 +118,98 @@ class RRule {
 			print("\n")
 		}
 	}
-		
-	// for some reason can't resolve this from file scope?
-	function ChooseRandomFromArray( arr ) 
-	{
-		local l = arr.len()
-		if ( l > 0 )
-		{
-			local retval = RandomInt( 0, l - 1 )
-			local _arr = arr[retval]
-			if ( "params" in _arr )
-			{
-				if ( ("odds" in _arr.params) && !(RandomInt(0, 100) <= _arr.params.odds) )
-					return null
-				if ( "fire" in _arr.params )
-				{
-					local relay = Entities.FindByName( null, _arr.params.fire[0] )
-					if ( (relay) && (relay.GetClassname() == "logic_relay") )
-						DoEntFire( "!self", _arr.params.fire[1], "", _arr.params.fire[2], null, relay )
-				}
-				if ( "speakonce" in _arr.params )
-					arr.remove(retval)
-			}
-			return _arr
-		}
-		else
-			return null
-	}
-	
-	// When a rule matches, call this to pick a response. 
+
+	// When a rule matches, call this to pick a response.
 	// TODO: test
-	function SelectResponse() 
+
+	function SelectResponse()
 	{
-		if ( Convars.GetFloat("rr_debugresponses") > 0 )
-		{
+		local debug = Convars.GetFloat("rr_debugresponses")
+		if ( debug > 0 ) {
 			print("Matched rule: " )
 			Describe( false )
 		}
-		if ( group_params.matchonce )
-		{
-			if ( selection_state.matched )
-			{
-				Disable()
-				return // do nothing
-			}
-			else
-				selection_state.matched = true
-		}
-		if ( group_params.permitrepeats )
-		{
+		assert(responses.len() != 0)
+
+		local res_index
+		if ( group_params.permitrepeats ) {
 			// just randomly pick a response
-			local R = ChooseRandomFromArray( responses )
-			if ( !R )
-			{
-				Disable()
-				return // do nothing
-			}
-			
-			if ( Convars.GetFloat("rr_debugresponses") > 0 )
-			{
-				print("Matched " )
-				R.Describe()
-			}
-			
-			return R
+			res_index = RandomInt( 0, responses.len() - 1 )
 		}
-		// else...
-		// get a list of response *indexes* that haven't played yet
-		local unplayed_resps = []
-		foreach (idx,val in selection_state.playedresponses)
-		{
-			if ( !val ) // if not been played...
-			{ 
-				unplayed_resps.push( idx )
+		else {
+			local unplayed_count = unplayed_responses.len();
+			switch(unplayed_count) {
+				case 0: // out of unplayed responses, reset
+					ResetUnplayedResponsesStack();
+					unplayed_count = unplayed_responses.len();
+					break;
+				case 1: //this will be last response so disable to not match it again in this round
+					if(group_params.norepeat) {
+						Disable();
+					}
+			}
+			// okay, now pick a response
+
+			if ( group_params.sequential ) {
+				res_index = unplayed_responses.pop()
+			}
+			else {
+				// choose randomly from available unplayed responses
+				res_index = unplayed_responses.remove(RandomInt( 0, unplayed_count - 1 ))
 			}
 		}
-		
-		if ( unplayed_resps.len() == 0 ) // out of unplayed responses, what do we do?
-		{
-			if (group_params.norepeat)
-			{
-				Disable()
-				return // do nothing
-			}
-			else //reset
-			{
-				selection_state.playedresponses = responses.map( @(x) false )
-				foreach (idx,val in selection_state.playedresponses)
-				{
-					unplayed_resps.push( idx )
+
+		local R = responses[res_index]
+		if ( "speakonce" in R.params ) {
+			responses.remove(res_index)
+			foreach(ix, rix in unplayed_responses) {
+				if(rix > res_index) {
+					unplayed_responses[ix] = rix - 1;
 				}
 			}
 		}
-		
-		// okay, now pick a response
-		if ( group_params.sequential )
-		{
-			local retval = selection_state.nextseq
-			selection_state.nextseq = (selection_state.nextseq + 1) % responses.len() // advance sequential counter
-			assert( selection_state.playedresponses[retval] == false )
-			// mark this response as played
-			selection_state.playedresponses[retval] = true 
-			local R = responses[retval]
-			
-			if ( Convars.GetFloat("rr_debugresponses") > 0 )
-			{
+		local chosen = {}
+		//chosen response that will be returned, set to empty unless it passes the odds
+		//ensures single return in this function and no duplicate check
+		//should we try to pick other response if odds don't pass instead if available ?
+		//TODO check regular talker odds behavior
+		if ( !("odds" in R.params) || RandomInt(0, 100) <= R.params.odds ) {
+			if ( debug > 0 ) {
 				print("Matched " )
 				R.Describe()
 			}
-			if ( ("odds" in R.params) && !(RandomInt(0, 100) <= R.params.odds) )
-			{
-				Disable()
-				return // do nothing
+			if ( "fire" in R.params ) {
+				//just fire whatever, no good reason to limit this to single logic_relay
+				EntFire( R.params.fire[0], R.params.fire[1], "", R.params.fire[2])
 			}
-			if ( "fire" in R.params )
-			{
-				local relay = Entities.FindByName( null, R.params.fire[0] )
-				if ( (relay) && (relay.GetClassname() == "logic_relay") )
-					DoEntFire( "!self", R.params.fire[1], "", R.params.fire[2], null, relay )
-			}
-			if ( "speakonce" in R.params )
-			{
-				responses.remove(retval)
-				selection_state.playedresponses.remove(retval)
-				selection_state.nextseq = selection_state.nextseq - 1
-			}
-			return R
+			chosen = R
 		}
-		else
-		{
-			// choose randomly from available unplayed responses
-			local retval = ChooseRandomFromArray( unplayed_resps )
-			selection_state.playedresponses[retval] = true
-			local R = responses[retval]
-			
-			if ( Convars.GetFloat("rr_debugresponses") > 0 )
-			{
-				print("Matched " )
-				R.Describe()
-			}
-			if ( ("odds" in R.params) && !(RandomInt(0, 100) <= R.params.odds) )
-			{
-				Disable()
-				return // do nothing
-			}
-			if ( "fire" in R.params )
-			{
-				local relay = Entities.FindByName( null, R.params.fire[0] )
-				if ( (relay) && (relay.GetClassname() == "logic_relay") )
-					DoEntFire( "!self", R.params.fire[1], "", R.params.fire[2], null, relay )
-			}
-			if ( "speakonce" in R.params )
-			{
-				responses.remove(retval)
-				selection_state.playedresponses.remove(retval)
-			}
-			return R
+
+		if ( group_params.matchonce || responses.len() == 0) {
+			Disable()
 		}
+		return chosen
 	}
-	
+
 	// tell the response engine to disable me
 	function Disable()
 	{
-		printl( "TODO: rule " + rulename + " wants to disable itself." )
+		enabled = false;
+		if(Convars.GetFloat("rr_debugresponses") > 0) {
+			printl( "Matching of rule " + rulename + " disabled until next round" )
+		}
+		//printl( "TODO: rule " + rulename + " wants to disable itself." )
 	}
-	
+
 	// properties
 	rulename = null;
-	criteria = [];
-	responses = [];
+	criteria = null;
+	responses = null;
+	original_responses = null;
 	group_params = null;
-	
-	// handles the 'response group' state which is 
-	// used to pick the next response in sequence, etc
-	selection_state = { 
-		nextseq = 0 , // next response to play if 'sequential' is true
-		playedresponses = [], // an array containing one bool per response -- indicating whether it's played or not, to handle 'permitrepeats'
-		matched = false, // used for 'matchonce'
-	}
+
+	enabled = true;
+
+	// stack of unplayed_responses
+	unplayed_responses = null;
 }

@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
-// Scriptedmode.nut 
-//  this holds the "control logic" for all scriptmodes, and loads up the Mode 
-//  and Map specific subscripts thus it has various initialization, 
+// Scriptedmode.nut
+//  this holds the "control logic" for all scriptmodes, and loads up the Mode
+//  and Map specific subscripts thus it has various initialization,
 //  default/override table merging, and a "root" manager class
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -51,40 +51,43 @@ ScriptedDamageInfo <-
 	Weapon = null				// by what - often Null (say if attacker was a common)
 }
 
+//initialize rr rules
+DoEntFire("!self", "RunScriptCode", "g_rr.rr_InitRules()", 0, null, Entities.First());
+
 //=========================================================
-// called from C++ when you try and kick off a mode to 
+// called from C++ when you try and kick off a mode to
 // decide whether scriptmode wants to handle it
 //=========================================================
 function ScriptMode_Init( modename, mapname )
 {
 	ClearGameEventCallbacks()
-	
+
 	::g_RoundState <- {}
 	::g_MapScript <- getroottable().DirectorScript.MapScript
 	::g_ModeScript <- getroottable().DirectorScript.MapScript.ChallengeScript
-	
+
 	// Just for convenience, so we don't have to keep checking if it's there
 	if ( !("MapState" in g_MapScript) )
 	{
 		g_MapScript.MapState <- {}
 	}
-	
+
 	IncludeScript( "sm_utilities", g_MapScript )  // so we have constants and such when we load the map...
 	IncludeScript( "sm_spawn", g_MapScript )      // and the spawning system
-	
+
 	if ( "CommunityUpdate" in getroottable() )
 	{
 		CommunityUpdate().OnScriptMode_Init()
 	}
 
 	// printl("In scripted Init, gonna try with for map " + mapname + " in mode " + modename )
-	
+
 	local bScriptedModeValid = false
-	
+
 	if ( IncludeScript( modename, g_ModeScript ) )
 	{
 		printl( "ScriptMode loaded " + modename + " and now Initializing" )
-		
+
 		IncludeScript( mapname + "_" + modename, g_MapScript )
 
 		// Add to the spawn array
@@ -104,7 +107,7 @@ function ScriptMode_Init( modename, mapname )
 		{
 			MergeSessionOptionTables()
 		}
-		
+
 		// Sanitize the map
 		if ( "SanitizeTable" in this )
 		{
@@ -113,10 +116,10 @@ function ScriptMode_Init( modename, mapname )
 
 		bScriptedModeValid = true;
 	}
-	
+
 	if ( !bScriptedModeValid )
 		return false
-		
+
 	if ( "SessionSpawns" in getroottable() )
 	{
 		EntSpawn_DoIncludes( ::SessionSpawns )
@@ -126,10 +129,10 @@ function ScriptMode_Init( modename, mapname )
 	IncludeScript( "sm_stages", g_MapScript )
 
 	// check for any scripthelp_<funcname> strings and create help entries for them
-	AddToScriptHelp( getroottable() )   
-	AddToScriptHelp( g_MapScript )    
+	AddToScriptHelp( getroottable() )
+	AddToScriptHelp( g_MapScript )
 	AddToScriptHelp( g_ModeScript )
-	
+
 	// go ahead and call all the precache elements - the MapSpawn table ones then any explicit OnPrecache's
 	ScriptedPrecache()
 	ScriptMode_SystemCall("Precache")
@@ -176,7 +179,7 @@ function ScriptMode_OnActivate( modename, mapname )
 	{
 		// Need to reload the mode script
 		// TODO: Should know exactly which script we want to load here
-		
+
 		g_ModeScript = getroottable().DirectorScript.MapScript.ChallengeScript
 
 		if ( IncludeScript( modename, g_ModeScript ) )
@@ -184,7 +187,7 @@ function ScriptMode_OnActivate( modename, mapname )
 			printl( "ScriptMode loaded " + modename + " and now Initializing" )
 		}
 	}
-		
+
 	if ( !SessionState.StartActive )
 	{
 		MergeSessionOptionTables()
@@ -210,7 +213,7 @@ function ScriptMode_OnShutdown( reason, nextmap )
 }
 
 //=========================================================
-// Called by RR system to add any global criteria to queries based on mode or map state 
+// Called by RR system to add any global criteria to queries based on mode or map state
 //=========================================================
 function ScriptMode_AddCriteria( )
 {   // @todo: is there a varargs for syscall? - if so swap this to a syscall
@@ -240,7 +243,7 @@ function MergeSessionSpawnTables()
 {
 	AddDefaultsToArray( "ModeSpawns", g_ModeScript, "MapSpawns", g_MapScript )
 	::SessionSpawns <- g_MapScript.MapSpawns
-}	
+}
 
 function MergeSessionStateTables()
 {
@@ -249,17 +252,17 @@ function MergeSessionStateTables()
 }
 
 function MergeSessionOptionTables()
-{	
+{
 	AddDefaultsToTable( "BaseScriptedDOTable", this, "DirectorOptions", g_ModeScript )
 	AddDefaultsToTable( "MutationOptions", g_ModeScript, "DirectorOptions", g_ModeScript )
 	AddDefaultsToTable( "MapOptions", g_MapScript, "DirectorOptions", g_ModeScript )
-	::SessionOptions <- g_ModeScript.DirectorOptions    
+	::SessionOptions <- g_ModeScript.DirectorOptions
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-// tick support via the "SlowPoll" 
-//   - allowing you to get an occasional persistent callback from C++ 
+// tick support via the "SlowPoll"
+//   - allowing you to get an occasional persistent callback from C++
 //   - keeps a list from which you can add and remove your own SlowPolls
 //
 // the "system" is remedial, just keeps a list, checks time delta, calls the list
@@ -329,7 +332,7 @@ function ScriptedMode_RemoveUpdate( updateFunc )
 	local idx = scriptedModeUpdateFuncs.find( updateFunc )
 	if (idx == null)
 		return false
-	scriptedModeUpdateFuncs.remove( idx )		
+	scriptedModeUpdateFuncs.remove( idx )
 	return true
 }
 
@@ -357,7 +360,7 @@ function UpdateHUDTable( hudTable )
 	foreach (key, val in hudTable.Fields)
 		if ("datafunc" in val)
 			val.dataval <- val.datafunc();
-	if ("PostCallback" in hudTable)  // so you can put a custom 
+	if ("PostCallback" in hudTable)  // so you can put a custom
 		hudTable.PostCallback()
 }
 
