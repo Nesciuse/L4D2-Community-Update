@@ -31,6 +31,10 @@ class Criterion {
 		printl( "Criterion " + key + " " + bottom + ".." + top + " weight " + weight )
 	}
 
+	function _typeof() {
+		return "Criterion";
+	}
+
 	//property
 	key = null;
 	bottom = null;
@@ -43,6 +47,10 @@ class OptionalCriterion extends Criterion {
 	function Describe() {
 		print( "Optional " );
 		base.Describe();
+	}
+
+	function _typeof() {
+		return "OptionalCriterion";
 	}
 }
 // Define a functor criterion, where the comparator is a function returning a bool
@@ -63,10 +71,16 @@ class CriterionFunc {
 		printl( "Criterion functor " + key + " -> " + func )
 	}
 
+	function _typeof() {
+		return "CriterionFunc";
+	}
+
 	//property
 	key = null;
 	func = null;
 	weight = 1;
+
+
 }
 
 class OptionalCriterionFunc extends CriterionFunc {
@@ -74,6 +88,10 @@ class OptionalCriterionFunc extends CriterionFunc {
 	function Describe() {
 		print( "Optional " );
 		base.Describe();
+	}
+
+	function _typeof() {
+		return "OptionalCriterionFunc";
 	}
 }
 // Multiple lines
@@ -101,8 +119,6 @@ class RRule {
 		original_responses = _responses
 		responses = clone _responses
 		group_params = _group_params
-
-		Init();
 	}
 
 	function Init() {
@@ -110,14 +126,36 @@ class RRule {
 			//speakonce param can remove a response from responses
 			responses = clone original_responses
 		}
-		ResetUnplayedResponsesStack();
+		ResetSelectionState();
 		enabled = true;
 	}
 
-	function ResetUnplayedResponsesStack() {
-		unplayed_responses = []
+	function ResetSelectionState() {
+		selection_state = clone _selection_state;
+		ProcessDisplayFirstLast();
+
+		selection_state.unplayed_responses = []
 		for(local ix = responses.len() - 1; ix >= 0; ix--) {
-			unplayed_responses.append(ix);
+			selection_state.unplayed_responses.append(ix);
+		}
+	}
+
+	function ProcessDisplayFirstLast() {
+		for(local ix = responses.len() - 1; ix >= 0; ix--) {
+			if("displayfirst" in responses[ix].params) {
+				if(selection_state.displayfirst != null) {
+					printl("warning multiple displayfirst params used in " + rulename);
+					continue;
+				}
+				selection_state.displayfirst = responses.remove(ix);
+			}
+			else if("displaylast" in responses[ix].params) {
+				if(selection_state.displaylast != null) {
+					printl("warning multiple displaylast params used in " + rulename);
+					continue;
+				}
+				selection_state.displaylast = responses.remove(ix);
+			}
 		}
 	}
 
@@ -150,30 +188,42 @@ class RRule {
 			print("Matched rule: " )
 			Describe( false )
 		}
-		assert(responses.len() != 0)
 
-		local res_index
-		if(group_params.permitrepeats) {
-			res_index = RandomInt( 0, responses.len() - 1 )
-		}
-		else if(group_params.sequential) {
-			res_index = unplayed_responses.pop()
+		local R = selection_state.displayfirst;
+		if(R) {
+			selection_state.displayfirst = null;
+			if( !("speakonce" in R.params) ) {
+				//was chosen to display first so put back among other responses
+				responses.append(R);
+			}
 		}
 		else {
-			// choose randomly from available unplayed responses
-			res_index = unplayed_responses.remove(RandomInt( 0, unplayed_responses.len() - 1 ))
-		}
-		//chosen response that will be returned, set to empty unless it passes the odds
-		//TODO check regular talker odds behavior
-		local R = responses[res_index], chosen = {}
-		if ( "speakonce" in R.params ) {
-			responses.remove(res_index)
-			foreach(ix, rix in unplayed_responses) {
-				if(rix > res_index) {
-					unplayed_responses[ix] = rix - 1;
+			local res_index
+			if(group_params.permitrepeats) {
+				res_index = RandomInt( 0, responses.len() - 1 )
+			}
+			else if(group_params.sequential) {
+				res_index = selection_state.unplayed_responses.pop()
+			}
+			else {
+				// choose randomly from available unplayed responses
+				local i = RandomInt( 0, selection_state.unplayed_responses.len() - 1)
+				res_index = selection_state.unplayed_responses.remove(i)
+			}
+			R = responses[res_index]
+			if ( "speakonce" in R.params ) {
+				responses.remove(res_index)
+				foreach(ix, rix in selection_state.unplayed_responses) {
+					if(rix > res_index) {
+						selection_state.unplayed_responses[ix] = rix - 1;
+					}
 				}
 			}
 		}
+		//chosen response that will be returned, set to empty unless it passes the odds
+		//TODO check regular talker odds behavior
+		local chosen = {}
+
 		if ( !("odds" in R.params) || RandomInt(0, 100) <= R.params.odds ) {
 			if ( debug != 0 ) {
 				print("Matched ")
@@ -184,17 +234,37 @@ class RRule {
 			}
 			chosen = R
 		}
-		if ( group_params.matchonce || responses.len() == 0) {
+		if ( group_params.matchonce ) {
 			Disable()
+			return chosen;
 		}
-		else if( unplayed_responses.len() == 0 ) {
-			if(group_params.norepeat) {
+
+		//if we permit repeats we don't care about unplayed_responses
+		if( !group_params.permitrepeats && selection_state.unplayed_responses.len() == 0 ) {
+			if(selection_state.displaylast) {
+				responses.append(selection_state.displaylast);
+				selection_state.unplayed_responses.append(responses.len() - 1)
+				selection_state.displaylast = null;
+			}
+			else if(group_params.norepeat) {
 				Disable();
 			}
 			else {
-				ResetUnplayedResponsesStack();
+				ResetSelectionState();
 			}
 		}
+
+		//speakonces or displayfirst/displaylast in 2 response long responses can cause this
+		if(responses.len() == 0) {
+			if(selection_state.displaylast) {
+				responses.append(selection_state.displaylast);
+				selection_state.displaylast = null;
+			}
+			else {
+				Disable();
+			}
+		}
+
 		return chosen
 	}
 
@@ -208,6 +278,10 @@ class RRule {
 		//printl( "TODO: rule " + rulename + " wants to disable itself." )
 	}
 
+	function _typeof() {
+		return "RRule";
+	}
+
 	// properties
 	rulename = null;
 	criteria = null;
@@ -218,5 +292,11 @@ class RRule {
 	enabled = true;
 
 	// stack of unplayed_responses with firts response on top
-	unplayed_responses = null;
+	selection_state = null
+	static _selection_state = {
+		unplayed_responses = null
+		displayfirst = null
+		displaylast = null
+	}
+
 }

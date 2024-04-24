@@ -71,6 +71,10 @@ class ResponseSingle {
 	{
 		return "ResponseSingle: " + target
 	}
+
+	function _typeof() {
+		return "ResponseSingle";
+	}
 }
 
 
@@ -100,6 +104,10 @@ class RGroupParams {
 	sequential = false;
 	norepeat = false;
 	matchonce = false;
+
+	function _typeof() {
+		return "RGroupParams";
+	}
 }
 
 
@@ -310,6 +318,10 @@ class RThen {
 	{
 		return "RThen: " + target
 	}
+
+	function _typeof() {
+		return "RThen";
+	}
 }
 
 // Given a single array representing a criterion,
@@ -322,6 +334,8 @@ class RThen {
 // [a]       if a is a function, becomes a functor criterion like (Null, a)  (eg the function is always called and gets a null fact)
 //           otherwise becomes [a, Null, Null], meaning "true if A exists in the query"
 // functor criteria must always be functions taking (val, query) where val is the value of a fact (may be Null) and 'query' is a table
+
+local number_type = { integer = 0, float = 0 };
 function rr_ProcessCriterion( crit )
 {
 	switch(typeof(crit)) {
@@ -338,7 +352,7 @@ function rr_ProcessCriterion( crit )
 					crit_static = OptionalCriterion
 					length--;
 				case 4:
-					assert(typeof(crit[3]) == "integer" || typeof(crit[3]) == "float")
+					assert(typeof(crit[3]) in number_type)
 					weight = crit[3];
 					length--;
 			}
@@ -519,11 +533,15 @@ local function enabled_rule_check(rule_container) {
 	}
 }
 
-local all_rules = [];
+local all_rules = {};
 function rr_InitRules() {
 	foreach(rule in all_rules) {
 		rule.Init();
 	}
+	/* if("rr_testing" in g_rr) {
+		local func = delete rr_testing;
+		g_MapScript.ScriptedMode_CallNextUpdate(func.bindenv(g_rr));
+	} */
 }
 
 //can add more easily if needed
@@ -564,10 +582,9 @@ function rr_ProcessRules( rulesarray )
 		//if applycontext/applycontexttoworld defined in rule insert it in each response that doesn't have it
 		rr_ProcessRuleApplyContexts(rule);
 
-		//not ideal to add function criteria to every single rule but it's a cheap one
 		local container = [null];
+		//not ideal to add function criteria to every single rule but it's a cheap one
 		rule.criteria.append(enabled_rule_check(container));
-
 		// needs to bindenv because because 'this' in map is the array whose map method was called
 		local coderule = RRule( rule.name,
 			rule.criteria.map( rr_ProcessCriterion.bindenv( this ) ),
@@ -577,9 +594,10 @@ function rr_ProcessRules( rulesarray )
 		foreach ( r in coderule.responses )
 		{
 			r.rule = coderule
-			all_rules.append(coderule)
+			all_rules[rule.name] <- coderule
 		}
 		container[0] = coderule
+		coderule.Init();
 
 		if( !rr_AddDecisionRule( coderule ) )
 		{

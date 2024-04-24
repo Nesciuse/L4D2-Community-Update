@@ -248,11 +248,22 @@ g_decisionrules <- [
     ],
     responses = [
         { func = @(s,q)printl("repeats 1") },
-        { func = @(s,q)printl("repeats 2"), speakonce = true},
+        {
+            func = @(s,q) printl("repeats 2 speakonce"),
+            speakonce = true
+        },
         { func = @(s,q)printl("repeats 3") },
-        { func = @(s,q)printl("repeats 4"), displaylast = true }, //makes sense if permitrepeates ?
+        {
+            func = @(s,q)printl("repeats 4 last"),
+            displaylast = true
+            //this response won't be chosen if permitrepeats is true
+            //only if all other responses had speakonce
+        },
         { func = @(s,q)printl("repeats 5") },
-        { func = @(s,q)printl("repeats 6"), displayfirst = true },
+        {
+            func = @(s,q)printl("repeats 6 first"),
+            displayfirst = true
+        },
         { func = @(s,q)printl("repeats 7") }
     ]
     applycontext = { context = "test", value = "666", duration = 0}
@@ -266,12 +277,18 @@ g_decisionrules <- [
     ],
     responses = [
 
-        { func = @(s,q)printl("norepeat 1")}
-        { func = @(s,q)printl("norepeat 2"), weight = 3 } //todo weight of responses
-        { func = @(s,q)printl("norepeat 3")}
-        { func = @(s,q)printl("norepeat 4")}
-        { func = @(s,q)printl("norepeat 5")}
-        { func = @(s,q)printl("norepeat 666"), displaylast = true }
+        { func = @(s,q)printl("norepeat 1") }
+        {
+            func = @(s,q)printl("norepeat 2"),
+            weight = 3  //todo weight of responses
+        }
+        { func = @(s,q)printl("norepeat 3") }
+        { func = @(s,q)printl("norepeat 4") }
+        { func = @(s,q)printl("norepeat 5") }
+        {
+            func = @(s,q)printl("norepeat 666"),
+            displaylast = true
+        }
     ]
     group_params = g_rr.RGroupParams({norepeat=true})
 }
@@ -285,8 +302,19 @@ g_decisionrules <- [
 
         { func = @(s,q)printl("norepeat seq 1") }
         { func = @(s,q)printl("norepeat seq 2") }
-        { func = @(s,q)printl("norepeat seq 3") }
+        {
+            func = @(s,q) printl("norepeat seq 3 first"),
+            displayfirst = true
+        }
         { func = @(s,q)printl("norepeat seq 4") }
+        { func = @(s,q)printl("norepeat seq 5") }
+        { func = @(s,q)printl("norepeat seq 6") }
+        {
+            func = @(s,q)printl("norepeat seq 7 last"),
+            displaylast=true
+        }
+        { func = @(s,q)printl("norepeat seq 8") }
+        { func = @(s,q)printl("norepeat seq 9") }
     ]
     group_params = g_rr.RGroupParams({norepeat=true, sequential=true})
 }
@@ -348,7 +376,8 @@ g_decisionrules <- [
 
 if(developer() && !IsDedicatedServer()) {
     function rr_testing() {
-        if(Convars.GetClientConvarValue("rr_test_rules", 1) != "") {
+        local val = Convars.GetClientConvarValue("rr_test_rules", 1);
+        if(val != "") {
             if(Convars.GetFloat("rr_debugresponses") == 0) {
                 printl("Setting rr_debugresponses to -1 for vscript rules")
                 Convars.SetValue("rr_debugresponses", -1);
@@ -363,6 +392,7 @@ if(developer() && !IsDedicatedServer()) {
             printl("use setinfo rr_test_rules 1 and reload the map to activate test rules");
         }
     }
+
     DoEntFire("!self", "RunScriptCode", @"
         g_MapScript.ScriptedMode_CallNextUpdate(g_rr.rr_testing.bindenv(g_rr));
     ", 10, null, Entities.First() );
